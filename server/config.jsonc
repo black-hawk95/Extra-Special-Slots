@@ -1,0 +1,12 @@
+{
+  // Choose who controls Special Slot 4 when TSC is installed.
+  //
+  // Allowed values: ExtraSpecialSlots or TSC
+  // Default: ExtraSpecialSlots
+  //
+  // ExtraSpecialSlots = Slot 4 follows the same filtering rules as the other special slots.
+  // TSC               = TSC keeps control of Slot 4.
+  //
+  // If TSC is not installed, ExtraSpecialSlots controls Slot 4 automatically.
+  "SpecialSlot4Owner": "ExtraSpecialSlots"
+}
