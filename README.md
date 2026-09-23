@@ -57,18 +57,4 @@ Allowed values: `ExtraSpecialSlots` or `TSC`.
 
 When SpecialSlots is installed, ExtraSpecialSlots makes sure the extra slots exist but does not try to override SpecialSlots filtering. SpecialSlots can apply its own configured filtering to the special slots.
 
-## Build
-
-From the project root in PowerShell:
-
-```powershell
-.\build.ps1
-```
-
-The script builds both projects, creates `dist`, and produces:
-
-```text
-release\ExtraSpecialSlots-v1.0.0.zip
-```
-
 That ZIP is the ready-to-install release package.
