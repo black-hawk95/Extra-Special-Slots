@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.1.0 — SPT 4.1.6
+
+- Fixed the map transit transfer screen freezing when it opens.
+- Fixed the backpack sometimes missing from the transfer screen.
+- Built the server mod with SPT 4.1.6.
+
+
 ## 1.0.0
 
 - Initial public release.

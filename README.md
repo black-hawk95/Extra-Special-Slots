@@ -1,4 +1,4 @@
-# ExtraSpecialSlots v1.0.0 — SPT 4.1.6
+# ExtraSpecialSlots v1.1.0 — SPT 4.1.6
 
 Adds Special Slots 4–6 while keeping vanilla/SVM behavior and compatibility with TSC, SpecialSlots, and Fika.
 
@@ -33,9 +33,9 @@ SPT_Runtime\user\mods\ExtraSpecialSlots\
 
 ### Fika Headless
 
-The recommended headless installation is still **server-side only**. Do not intentionally install the client DLL on the headless instance.
+Do not install `BlackHawk-ExtraSpecialSlots.Client.dll` on the headless instance. Keep the SPT server mod on the backend server. If Fika's mod validation marks `blackhawk.extraspecialslots.client` as required, update that rule before removing a preexisting headless copy; otherwise Fika may reject the headless client. Install the same v1.1.0 client DLL on each normal playing client.
 
-If the client DLL is present there by mistake, its soft dependency on the official Fika Headless plugin GUID `com.fika.headless` guarantees Headless loads first. ExtraSpecialSlots then detects it in BepInEx `Chainloader.PluginInfos`, disables itself before applying any UI/Harmony patches, and leaves the server-side mod running.
+If the client DLL is present on headless by mistake, its soft dependency on `com.fika.headless` loads the headless plugin first. ExtraSpecialSlots then detects it in BepInEx `Chainloader.PluginInfos` and disables its UI patches. Fika can still detect and validate the DLL's hash, so leaving an older client DLL on headless is not a reliable way to avoid version conflicts.
 
 ## Slot 4 config
 
@@ -57,4 +57,20 @@ Allowed values: `ExtraSpecialSlots` or `TSC`.
 
 When SpecialSlots is installed, ExtraSpecialSlots makes sure the extra slots exist but does not try to override SpecialSlots filtering. SpecialSlots can apply its own configured filtering to the special slots.
 
-That ZIP is the ready-to-install release package.
+## Building against SPT 4.1.6
+
+Use the DLLs from your actual SPT 4.1.6 game installation:
+
+```powershell
+dotnet build .\client\ExtraSpecialSlots.Client.csproj -c Release -p:SPTPath="C:\path\to\SPT 4.1.6"
+```
+
+Build the backend server mod separately; it restores the SPT 4.1.6 NuGet packages:
+
+```powershell
+dotnet build .\server\ExtraSpecialSlots.csproj -c Release
+```
+
+The client and server DLLs appear in their respective `bin\Release` folders. Install the server DLL only on the SPT backend server. The headless PC does not need the client UI DLL.
+
+v1.1.0 fixes the map transit transfer screen freezing when it opens. Inventory transfers to the hideout stash during transit are separate and should be tested with Fika Strict Inventory Sync enabled.

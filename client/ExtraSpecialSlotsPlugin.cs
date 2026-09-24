@@ -1,4 +1,6 @@
 using System;
+using System.Collections;
+using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using BepInEx;
@@ -18,9 +20,11 @@ public sealed class ExtraSpecialSlotsPlugin : BaseUnityPlugin
 {
     public const string Guid = "blackhawk.extraspecialslots.client";
     public const string Name = "ExtraSpecialSlots";
-    public const string Version = "1.0.0";
+    public const string Version = "1.1.0";
 
     internal static ManualLogSource Log = null!;
+    private static ExtraSpecialSlotsPlugin? _instance;
+    private static readonly HashSet<int> PendingPanels = new();
 
     // Official Fika Headless BepInEx plugin GUID.
     // Fika Headless itself registers as: [BepInPlugin("com.fika.headless", ...)].
@@ -29,6 +33,7 @@ public sealed class ExtraSpecialSlotsPlugin : BaseUnityPlugin
     private void Awake()
     {
         Log = Logger;
+        _instance = this;
 
         // Headless safety guard: the client DLL may be present by mistake on a
         // Fika Headless install. Detect Fika Headless through BepInEx's plugin
@@ -64,54 +69,101 @@ public sealed class ExtraSpecialSlotsPlugin : BaseUnityPlugin
     }
 
     /// <summary>
-    /// This is intentionally the same UI strategy used by Salco's Comfort Kit:
-    /// patch SearchableSlotView.CreateSlots, get the private _specSlotsPanel,
-    /// replace its HorizontalLayoutGroup with a 3-column GridLayoutGroup, and
-    /// resize only the panel's VERTICAL axis before rebuilding the layout.
-    ///
-    /// Do not set the panel width and do not scan the scene hierarchy.
+    /// Tarkov also constructs this panel while opening the in-raid transit
+    /// transfer screen. DestroyImmediate is forbidden during that UI callback:
+    /// Unity leaves the horizontal group in place, rejects the grid group, and
+    /// the resulting exception prevents the screen (and its controls) from
+    /// finishing initialization. Remove the old group normally and install
+    /// the grid on the following frame instead.
     /// </summary>
     private static void ArrangeAsGrid(RectTransform panel)
     {
-        var grid = panel.GetComponent<GridLayoutGroup>();
+        if (_instance == null || !_instance.isActiveAndEnabled)
+            return;
 
-        if (grid == null)
+        var panelId = panel.GetInstanceID();
+        if (!PendingPanels.Add(panelId))
+            return;
+
+        try
         {
+            var grid = panel.GetComponent<GridLayoutGroup>();
             var horizontal = panel.GetComponent<HorizontalLayoutGroup>();
-            var oldPadding = horizontal != null ? horizontal.padding : null;
-            var oldSpacing = horizontal != null ? horizontal.spacing : 0f;
+            var sourcePadding = grid != null ? grid.padding : horizontal?.padding;
+            var padding = sourcePadding != null
+                ? new RectOffset(sourcePadding.left, sourcePadding.right, sourcePadding.top, sourcePadding.bottom)
+                : new RectOffset();
+            var spacing = grid != null ? grid.spacing.x : horizontal?.spacing ?? 0f;
 
             if (horizontal != null)
-                UnityEngine.Object.DestroyImmediate(horizontal);
+            {
+                horizontal.enabled = false;
+                UnityEngine.Object.Destroy(horizontal);
+            }
 
-            grid = panel.gameObject.AddComponent<GridLayoutGroup>();
-            grid.padding = oldPadding != null
-                ? new RectOffset(oldPadding.left, oldPadding.right, oldPadding.top, oldPadding.bottom)
-                : new RectOffset();
-            grid.spacing = new Vector2(oldSpacing, oldSpacing);
+            _instance.StartCoroutine(InstallGridNextFrame(panel, panelId, padding, spacing));
         }
+        catch
+        {
+            PendingPanels.Remove(panelId);
+            throw;
+        }
+    }
 
-        // Comfort Kit uses EFT's own 1x1 inventory-cell pixel size rather than
-        // guessing from transforms. This keeps the SPEC slots identical to EFT.
-        var cellPixels = ItemViewFactory.GetCellPixelSize(new IntVec2(1, 1));
-        grid.cellSize = new Vector2(cellPixels.X, cellPixels.Y);
-        grid.startCorner = GridLayoutGroup.Corner.UpperLeft;
-        grid.startAxis = GridLayoutGroup.Axis.Horizontal;
-        grid.constraint = GridLayoutGroup.Constraint.FixedColumnCount;
-        grid.constraintCount = 3;
+    private static IEnumerator InstallGridNextFrame(RectTransform panel, int panelId, RectOffset padding, float spacing)
+    {
+        // Destroy(Component) completes at the end of the frame. Adding another
+        // LayoutGroup before then fails even if the old group is disabled.
+        yield return null;
 
-        var rows = Math.Max(1, (panel.childCount + 3 - 1) / 3);
-        var height = grid.padding.vertical
-                     + rows * grid.cellSize.y
-                     + Math.Max(0, rows - 1) * grid.spacing.y;
+        try
+        {
+            if (panel != null)
+            {
+                if (panel.GetComponent<HorizontalLayoutGroup>() != null)
+                {
+                    Log.LogWarning("ExtraSpecialSlots: horizontal layout still present; skipping grid conversion.");
+                }
+                else
+                {
+                    var grid = panel.GetComponent<GridLayoutGroup>() ?? panel.gameObject.AddComponent<GridLayoutGroup>();
+                    if (grid == null)
+                    {
+                        Log.LogWarning("ExtraSpecialSlots: could not install special slots grid.");
+                    }
+                    else
+                    {
+                        grid.padding = padding;
+                        grid.spacing = new Vector2(spacing, spacing);
 
-        // Important: only increase vertical space. Changing width is what caused
-        // the inventory to become horizontally scrollable in the earlier builds.
-        panel.SetSizeWithCurrentAnchors(RectTransform.Axis.Vertical, height);
+                        var cellPixels = ItemViewFactory.GetCellPixelSize(new IntVec2(1, 1));
+                        grid.cellSize = new Vector2(cellPixels.X, cellPixels.Y);
+                        grid.startCorner = GridLayoutGroup.Corner.UpperLeft;
+                        grid.startAxis = GridLayoutGroup.Axis.Horizontal;
+                        grid.constraint = GridLayoutGroup.Constraint.FixedColumnCount;
+                        grid.constraintCount = 3;
 
-        LayoutRebuilder.ForceRebuildLayoutImmediate(panel);
-        if (panel.parent is RectTransform parent)
-            LayoutRebuilder.ForceRebuildLayoutImmediate(parent);
+                        var rows = Math.Max(1, (panel.childCount + 2) / 3);
+                        var height = grid.padding.vertical
+                                     + rows * grid.cellSize.y
+                                     + Math.Max(0, rows - 1) * grid.spacing.y;
+                        panel.SetSizeWithCurrentAnchors(RectTransform.Axis.Vertical, height);
+
+                        LayoutRebuilder.ForceRebuildLayoutImmediate(panel);
+                        if (panel.parent is RectTransform parent)
+                            LayoutRebuilder.ForceRebuildLayoutImmediate(parent);
+                    }
+                }
+            }
+        }
+        catch (Exception e)
+        {
+            Log.LogError($"ExtraSpecialSlots: failed to arrange special slots: {e}");
+        }
+        finally
+        {
+            PendingPanels.Remove(panelId);
+        }
     }
 
     [HarmonyPatch(typeof(SearchableSlotView), "CreateSlots")]
@@ -120,17 +172,25 @@ public sealed class ExtraSpecialSlotsPlugin : BaseUnityPlugin
         [HarmonyPostfix]
         private static void Postfix(SearchableSlotView __instance, Item __0)
         {
-            if (!HasSixSpecialSlots(__0))
-                return;
-
-            var panel = SpecialSlotPanelField?.GetValue(__instance) as RectTransform;
-            if (panel == null)
+            try
             {
-                Log.LogWarning("ExtraSpecialSlots: SearchableSlotView._specSlotsPanel was not found.");
-                return;
-            }
+                if (!HasSixSpecialSlots(__0))
+                    return;
 
-            ArrangeAsGrid(panel);
+                var panel = SpecialSlotPanelField?.GetValue(__instance) as RectTransform;
+                if (panel == null)
+                {
+                    Log.LogWarning("ExtraSpecialSlots: SearchableSlotView._specSlotsPanel was not found.");
+                    return;
+                }
+
+                ArrangeAsGrid(panel);
+            }
+            catch (Exception e)
+            {
+                // An optional UI layout must never abort EFT screen initialization.
+                Log.LogError($"ExtraSpecialSlots: failed to schedule special slots layout: {e}");
+            }
         }
     }
 }
