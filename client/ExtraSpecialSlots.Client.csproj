@@ -6,7 +6,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <AssemblyName>BlackHawk-ExtraSpecialSlots.Client</AssemblyName>
     <RootNamespace>BlackHawk.ExtraSpecialSlots.Client</RootNamespace>
-    <Version>1.0.0</Version>
+    <Version>1.0.1</Version>
     <SPTPath Condition="'$(SPTPath)' == ''">C:\EFT .0.16.9.5.40743 - SPT 4.1 - Fika client</SPTPath>
   </PropertyGroup>
 
