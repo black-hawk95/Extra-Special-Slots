@@ -7,8 +7,14 @@
     <AssemblyName>BlackHawk-ExtraSpecialSlots.Client</AssemblyName>
     <RootNamespace>BlackHawk.ExtraSpecialSlots.Client</RootNamespace>
     <Version>1.0.1</Version>
-    <SPTPath Condition="'$(SPTPath)' == ''">C:\EFT .0.16.9.5.40743 - SPT 4.1 - Fika client</SPTPath>
   </PropertyGroup>
+
+  <Target Name="ValidateSptPath" BeforeTargets="ResolveReferences">
+    <Error Condition="'$(SPTPath)' == ''"
+           Text="Supply -p:SPTPath=PATH_TO_SPT_4.1.6 pointing to your SPT 4.1.6 installation." />
+    <Error Condition="'$(SPTPath)' != '' and !Exists('$(SPTPath)\EscapeFromTarkov_Data\Managed\Assembly-CSharp.dll')"
+           Text="SPTPath must point to an SPT 4.1.6 installation containing EscapeFromTarkov_Data\Managed\Assembly-CSharp.dll." />
+  </Target>
 
   <ItemGroup>
     <Reference Include="BepInEx">
