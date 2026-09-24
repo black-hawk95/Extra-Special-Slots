@@ -6,6 +6,7 @@
 - Fixed the backpack sometimes missing from the transfer screen.
 - Built the server mod with SPT 4.1.6.
 
+**Fika Headless:** Do not install the client DLL in `BepInEx\plugins` on the headless PC. Install the server mod in `SPT_Runtime\user\mods` on the SPT server.
 
 ## 1.0.0
 
