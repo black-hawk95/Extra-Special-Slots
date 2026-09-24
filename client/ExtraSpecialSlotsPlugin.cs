@@ -20,7 +20,7 @@ public sealed class ExtraSpecialSlotsPlugin : BaseUnityPlugin
 {
     public const string Guid = "blackhawk.extraspecialslots.client";
     public const string Name = "ExtraSpecialSlots";
-    public const string Version = "1.0.1";
+    public const string Version = "1.1.0";
 
     internal static ManualLogSource Log = null!;
     private static ExtraSpecialSlotsPlugin? _instance;
