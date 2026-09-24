@@ -9,8 +9,8 @@ public sealed record ModMetadata : IModMetadata
     public string ModGuid { get; init; } = "com.blackhawk.extraspecialslots";
     public string Name { get; init; } = "ExtraSpecialSlots";
     public string Author { get; init; } = "BLACK HAWK";
-    public SemanticVersioning.Version Version { get; init; } = new("1.0.0");
-    public SemanticVersioning.Range SptVersion { get; init; } = new(">=4.1.3 <4.2.0");
+    public SemanticVersioning.Version Version { get; init; } = new("1.0.1");
+    public SemanticVersioning.Range SptVersion { get; init; } = new(">=4.1.6 <4.1.7");
     public string License { get; init; } = "MIT";
     public string? Url { get; init; } = null;
     public List<string> Contributors { get; init; } = new();
