@@ -1,4 +1,4 @@
-# ExtraSpecialSlots v1.0.1 test fix — SPT 4.1.6
+# ExtraSpecialSlots v1.1.0 — SPT 4.1.6
 
 Adds Special Slots 4–6 while keeping vanilla/SVM behavior and compatibility with TSC, SpecialSlots, and Fika.
 
@@ -33,7 +33,7 @@ SPT_Runtime\user\mods\ExtraSpecialSlots\
 
 ### Fika Headless
 
-Do not install `BlackHawk-ExtraSpecialSlots.Client.dll` on the headless instance. Keep the SPT server mod on the backend server. If Fika's mod validation marks `blackhawk.extraspecialslots.client` as required, update that rule before removing a preexisting headless copy; otherwise Fika may reject the headless client. Install the same tested client DLL on each normal playing client.
+Do not install `BlackHawk-ExtraSpecialSlots.Client.dll` on the headless instance. Keep the SPT server mod on the backend server. If Fika's mod validation marks `blackhawk.extraspecialslots.client` as required, update that rule before removing a preexisting headless copy; otherwise Fika may reject the headless client. Install the same v1.1.0 client DLL on each normal playing client.
 
 If the client DLL is present on headless by mistake, its soft dependency on `com.fika.headless` loads the headless plugin first. ExtraSpecialSlots then detects it in BepInEx `Chainloader.PluginInfos` and disables its UI patches. Fika can still detect and validate the DLL's hash, so leaving an older client DLL on headless is not a reliable way to avoid version conflicts.
 
@@ -73,4 +73,4 @@ dotnet build .\server\ExtraSpecialSlots.csproj -c Release
 
 The client and server DLLs appear in their respective `bin\Release` folders. Install the server DLL only on the SPT backend server. The headless PC does not need the client UI DLL.
 
-This is a test branch. Verify map transit delivery and normal inventory in SPT 4.1.6 with Fika 2.4.3 before publishing.
+v1.1.0 fixes the map transit transfer screen freezing when it opens. Inventory transfers to the hideout stash during transit are separate and should be tested with Fika Strict Inventory Sync enabled.
