@@ -65,4 +65,12 @@ Use the DLLs from your actual SPT 4.1.6 game installation:
 dotnet build .\client\ExtraSpecialSlots.Client.csproj -c Release -p:SPTPath="C:\path\to\SPT 4.1.6"
 ```
 
+Build the backend server mod separately; it restores the SPT 4.1.6 NuGet packages:
+
+```powershell
+dotnet build .\server\ExtraSpecialSlots.csproj -c Release
+```
+
+The client and server DLLs appear in their respective `bin\Release` folders. Install the server DLL only on the SPT backend server. The headless PC does not need the client UI DLL.
+
 This is a test branch. Verify map transit delivery and normal inventory in SPT 4.1.6 with Fika 2.4.3 before publishing.
