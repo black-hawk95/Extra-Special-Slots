@@ -1,6 +1,4 @@
 using System;
-using System.Collections;
-using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using BepInEx;
@@ -20,11 +18,10 @@ public sealed class ExtraSpecialSlotsPlugin : BaseUnityPlugin
 {
     public const string Guid = "blackhawk.extraspecialslots.client";
     public const string Name = "ExtraSpecialSlots";
-    public const string Version = "1.1.0";
+    public const string Version = "1.1.1";
 
     internal static ManualLogSource Log = null!;
     private static ExtraSpecialSlotsPlugin? _instance;
-    private static readonly HashSet<int> PendingPanels = new();
 
     // Official Fika Headless BepInEx plugin GUID.
     // Fika Headless itself registers as: [BepInPlugin("com.fika.headless", ...)].
@@ -49,7 +46,7 @@ public sealed class ExtraSpecialSlotsPlugin : BaseUnityPlugin
         {
             var harmony = new Harmony(Guid);
             harmony.CreateClassProcessor(typeof(CreateSlotsPatch)).Patch();
-            Log.LogInfo($"{Name} {Version}: patched SearchableSlotView.CreateSlots.");
+            Log.LogInfo($"{Name} {Version}: native-slot layout enabled.");
         }
         catch (Exception e)
         {
@@ -60,6 +57,9 @@ public sealed class ExtraSpecialSlotsPlugin : BaseUnityPlugin
     private static readonly FieldInfo? SpecialSlotPanelField =
         AccessTools.Field(typeof(SearchableSlotView), "_specSlotsPanel");
 
+    private static readonly FieldInfo? SpecialSlotTemplateField =
+        AccessTools.Field(typeof(SearchableSlotView), "_specSlotTemplate");
+
     private static bool HasSixSpecialSlots(Item item)
     {
         return item is CompoundItem compound &&
@@ -68,102 +68,25 @@ public sealed class ExtraSpecialSlotsPlugin : BaseUnityPlugin
                    slot.Name?.StartsWith("SpecialSlot", StringComparison.OrdinalIgnoreCase) == true) >= 6;
     }
 
-    /// <summary>
-    /// Tarkov also constructs this panel while opening the in-raid transit
-    /// transfer screen. DestroyImmediate is forbidden during that UI callback:
-    /// Unity leaves the horizontal group in place, rejects the grid group, and
-    /// the resulting exception prevents the screen (and its controls) from
-    /// finishing initialization. Remove the old group normally and install
-    /// the grid on the following frame instead.
-    /// </summary>
-    private static void ArrangeAsGrid(RectTransform panel)
+    // Keep the native layout component alive. Destroying/replacing it required
+    // delayed sizing in 1.1.0; this layout supplies bounds synchronously instead.
+    private static void ArrangeAsGrid(RectTransform panel, SlotView template, Slot[] slots)
     {
-        if (_instance == null || !_instance.isActiveAndEnabled)
-            return;
-
-        var panelId = panel.GetInstanceID();
-        if (!PendingPanels.Add(panelId))
-            return;
-
-        try
+        if (_instance == null || !_instance.isActiveAndEnabled) return;
+        var layout = panel.GetComponent<SpecialSlotsLayout>();
+        if (layout == null)
         {
-            var grid = panel.GetComponent<GridLayoutGroup>();
             var horizontal = panel.GetComponent<HorizontalLayoutGroup>();
-            var sourcePadding = grid != null ? grid.padding : horizontal?.padding;
-            var padding = sourcePadding != null
-                ? new RectOffset(sourcePadding.left, sourcePadding.right, sourcePadding.top, sourcePadding.bottom)
-                : new RectOffset();
-            var spacing = grid != null ? grid.spacing.x : horizontal?.spacing ?? 0f;
-
-            if (horizontal != null)
-            {
-                horizontal.enabled = false;
-                UnityEngine.Object.Destroy(horizontal);
-            }
-
-            _instance.StartCoroutine(InstallGridNextFrame(panel, panelId, padding, spacing));
+            var padding = horizontal != null ? horizontal.padding : new RectOffset();
+            var spacing = horizontal != null ? horizontal.spacing : 0f;
+            if (horizontal != null) horizontal.enabled = false;
+            layout = panel.gameObject.AddComponent<SpecialSlotsLayout>();
+            layout.Initialize(padding, spacing);
         }
-        catch
-        {
-            PendingPanels.Remove(panelId);
-            throw;
-        }
-    }
-
-    private static IEnumerator InstallGridNextFrame(RectTransform panel, int panelId, RectOffset padding, float spacing)
-    {
-        // Destroy(Component) completes at the end of the frame. Adding another
-        // LayoutGroup before then fails even if the old group is disabled.
-        yield return null;
-
-        try
-        {
-            if (panel != null)
-            {
-                if (panel.GetComponent<HorizontalLayoutGroup>() != null)
-                {
-                    Log.LogWarning("ExtraSpecialSlots: horizontal layout still present; skipping grid conversion.");
-                }
-                else
-                {
-                    var grid = panel.GetComponent<GridLayoutGroup>() ?? panel.gameObject.AddComponent<GridLayoutGroup>();
-                    if (grid == null)
-                    {
-                        Log.LogWarning("ExtraSpecialSlots: could not install special slots grid.");
-                    }
-                    else
-                    {
-                        grid.padding = padding;
-                        grid.spacing = new Vector2(spacing, spacing);
-
-                        var cellPixels = ItemViewFactory.GetCellPixelSize(new IntVec2(1, 1));
-                        grid.cellSize = new Vector2(cellPixels.X, cellPixels.Y);
-                        grid.startCorner = GridLayoutGroup.Corner.UpperLeft;
-                        grid.startAxis = GridLayoutGroup.Axis.Horizontal;
-                        grid.constraint = GridLayoutGroup.Constraint.FixedColumnCount;
-                        grid.constraintCount = 3;
-
-                        var rows = Math.Max(1, (panel.childCount + 2) / 3);
-                        var height = grid.padding.vertical
-                                     + rows * grid.cellSize.y
-                                     + Math.Max(0, rows - 1) * grid.spacing.y;
-                        panel.SetSizeWithCurrentAnchors(RectTransform.Axis.Vertical, height);
-
-                        LayoutRebuilder.ForceRebuildLayoutImmediate(panel);
-                        if (panel.parent is RectTransform parent)
-                            LayoutRebuilder.ForceRebuildLayoutImmediate(parent);
-                    }
-                }
-            }
-        }
-        catch (Exception e)
-        {
-            Log.LogError($"ExtraSpecialSlots: failed to arrange special slots: {e}");
-        }
-        finally
-        {
-            PendingPanels.Remove(panelId);
-        }
+        layout.Bind(template, slots);
+        layout.Apply();
+        layout.LogBindings();
+        LayoutRebuilder.MarkLayoutForRebuild(panel);
     }
 
     [HarmonyPatch(typeof(SearchableSlotView), "CreateSlots")]
@@ -184,7 +107,15 @@ public sealed class ExtraSpecialSlotsPlugin : BaseUnityPlugin
                     return;
                 }
 
-                ArrangeAsGrid(panel);
+                var template = SpecialSlotTemplateField?.GetValue(__instance) as SlotView;
+                if (template == null)
+                {
+                    Log.LogWarning("ExtraSpecialSlots: special slot template unavailable; leaving native layout intact.");
+                    return;
+                }
+                var slots = ((CompoundItem)__0).Slots.Where(slot => slot != null &&
+                    slot.Name?.StartsWith("SpecialSlot", StringComparison.OrdinalIgnoreCase) == true).ToArray();
+                ArrangeAsGrid(panel, template, slots);
             }
             catch (Exception e)
             {
@@ -194,3 +125,4 @@ public sealed class ExtraSpecialSlotsPlugin : BaseUnityPlugin
         }
     }
 }
+

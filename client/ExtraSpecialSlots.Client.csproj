@@ -6,7 +6,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <AssemblyName>BlackHawk-ExtraSpecialSlots.Client</AssemblyName>
     <RootNamespace>BlackHawk.ExtraSpecialSlots.Client</RootNamespace>
-    <Version>1.1.0</Version>
+    <Version>1.1.1</Version>
   </PropertyGroup>
 
   <Target Name="ValidateSptPath" BeforeTargets="ResolveReferences">
@@ -29,6 +29,10 @@
       <HintPath>$(SPTPath)\EscapeFromTarkov_Data\Managed\Assembly-CSharp.dll</HintPath>
       <Private>false</Private>
     </Reference>
+    <Reference Include="Sirenix.Serialization">
+      <HintPath>$(SPTPath)\EscapeFromTarkov_Data\Managed\Sirenix.Serialization.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
     <Reference Include="UnityEngine">
       <HintPath>$(SPTPath)\EscapeFromTarkov_Data\Managed\UnityEngine.dll</HintPath>
       <Private>false</Private>
@@ -43,3 +47,4 @@
     </Reference>
   </ItemGroup>
 </Project>
+
